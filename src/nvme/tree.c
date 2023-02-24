@@ -353,11 +353,11 @@ nvme_path_t nvme_namespace_next_path(nvme_ns_t ns, nvme_path_t p)
 static void __nvme_free_ns(struct nvme_ns *n)
 {
 	list_del_init(&n->entry);
-	struct dev_handle *hnd = n->hnd;
-	close(hnd->fd);
+	struct dev_handle *hdl = n->hdl;
+	close(hdl->fd);
 	free(n->generic_name);
 	free(n->name);
-	free(n->hnd);
+	free(n->hdl);
 	free(n->sysfs_dir);
 	free(n);
 }
@@ -719,15 +719,15 @@ free_path:
 void* nvme_ctrl_get_fd(nvme_ctrl_t c)
 {
 	nvme_root_t r = c->s && c->s->h ? c->s->h->r : NULL;
-	struct dev_handle *hnd = c->hnd;
-	if (hnd->fd < 0) {
-		hnd->fd = nvme_open(c->name);
-		if (hnd->fd < 0)
+	struct dev_handle *hdl = c->hdl;
+	if (hdl->fd < 0) {
+		hdl->fd = nvme_open(c->name);
+		if (hdl->fd < 0)
 			nvme_msg(r, LOG_ERR,
 				 "Failed to open ctrl %s, errno %d\n",
 				 c->name, errno);
 	}
-	return hnd;
+	return hdl;
 }
 
 nvme_subsystem_t nvme_ctrl_get_subsystem(nvme_ctrl_t c)
@@ -924,10 +924,10 @@ nvme_path_t nvme_ctrl_next_path(nvme_ctrl_t c, nvme_path_t p)
 	do { if (a) { free(a); (a) = NULL; } } while (0)
 void nvme_deconfigure_ctrl(nvme_ctrl_t c)
 {
-	struct dev_handle *hnd = c->hnd;
-	if (hnd!= NULL && hnd->fd >= 0) {
-		close(hnd->fd);
-		hnd->fd = -1;
+	struct dev_handle *hdl = c->hdl;
+	if (hdl!= NULL && hdl->fd >= 0) {
+		close(hdl->fd);
+		hdl->fd = -1;
 	}
 	FREE_CTRL_ATTR(c->name);
 	FREE_CTRL_ATTR(c->sysfs_dir);
@@ -1040,7 +1040,7 @@ struct nvme_ctrl *nvme_create_ctrl(nvme_root_t r,
 		errno = ENOMEM;
 		return NULL;
 	}
-	c->hnd = NULL;
+	c->hdl = NULL;
 	nvmf_default_config(&c->cfg);
 	list_head_init(&c->namespaces);
 	list_head_init(&c->paths);
@@ -1195,7 +1195,7 @@ static int nvme_configure_ctrl(nvme_root_t r, nvme_ctrl_t c, const char *path,
 	}
 	closedir(d);
 
-	c->hnd = NULL;
+	c->hdl = NULL;
 	c->name = strdup(name);
 	c->sysfs_dir = (char *)path;
 	c->firmware = nvme_get_ctrl_attr(c, "firmware_rev");
@@ -1486,9 +1486,9 @@ static int nvme_bytes_to_lba(nvme_ns_t n, off_t offset, size_t count,
 	return 0;
 }
 
-void* nvme_ns_get_fd(nvme_ns_t n)
+void* nvme_ns_get_hdl(nvme_ns_t n)
 {
-	return n->hnd;
+	return n->hdl;
 }
 
 nvme_subsystem_t nvme_ns_get_subsystem(nvme_ns_t n)
@@ -1578,19 +1578,19 @@ void nvme_ns_get_uuid(nvme_ns_t n, unsigned char out[NVME_UUID_LEN])
 
 int nvme_ns_identify(nvme_ns_t n, struct nvme_id_ns *ns)
 {
-	return nvme_identify_ns(nvme_ns_get_fd(n), nvme_ns_get_nsid(n), ns);
+	return nvme_identify_ns(nvme_ns_get_hdl(n), nvme_ns_get_nsid(n), ns);
 }
 
 int nvme_ns_identify_descs(nvme_ns_t n, struct nvme_ns_id_desc *descs)
 {
-	return nvme_identify_ns_descs(nvme_ns_get_fd(n), nvme_ns_get_nsid(n), descs);
+	return nvme_identify_ns_descs(nvme_ns_get_hdl(n), nvme_ns_get_nsid(n), descs);
 }
 
 int nvme_ns_verify(nvme_ns_t n, off_t offset, size_t count)
 {
 	struct nvme_io_args args = {
 		.args_size = sizeof(args),
-		.hnd = nvme_ns_get_fd(n),
+		.hdl = nvme_ns_get_hdl(n),
 		.nsid = nvme_ns_get_nsid(n),
 		.control = 0,
 		.dsm = 0,
@@ -1617,7 +1617,7 @@ int nvme_ns_write_uncorrectable(nvme_ns_t n, off_t offset, size_t count)
 {
 	struct nvme_io_args args = {
 		.args_size = sizeof(args),
-		.hnd = nvme_ns_get_fd(n),
+		.hdl = nvme_ns_get_hdl(n),
 		.nsid = nvme_ns_get_nsid(n),
 		.control = 0,
 		.dsm = 0,
@@ -1644,7 +1644,7 @@ int nvme_ns_write_zeros(nvme_ns_t n, off_t offset, size_t count)
 {
 	struct nvme_io_args args = {
 		.args_size = sizeof(args),
-		.hnd = nvme_ns_get_fd(n),
+		.hdl = nvme_ns_get_hdl(n),
 		.nsid = nvme_ns_get_nsid(n),
 		.control = 0,
 		.dsm = 0,
@@ -1671,7 +1671,7 @@ int nvme_ns_write(nvme_ns_t n, void *buf, off_t offset, size_t count)
 {
 	struct nvme_io_args args = {
 		.args_size = sizeof(args),
-		.hnd = nvme_ns_get_fd(n),
+		.hdl = nvme_ns_get_hdl(n),
 		.nsid = nvme_ns_get_nsid(n),
 		.control = 0,
 		.dsm = 0,
@@ -1698,7 +1698,7 @@ int nvme_ns_read(nvme_ns_t n, void *buf, off_t offset, size_t count)
 {
 	struct nvme_io_args args = {
 		.args_size = sizeof(args),
-		.hnd = nvme_ns_get_fd(n),
+		.hdl = nvme_ns_get_hdl(n),
 		.nsid = nvme_ns_get_nsid(n),
 		.control = 0,
 		.dsm = 0,
@@ -1725,7 +1725,7 @@ int nvme_ns_compare(nvme_ns_t n, void *buf, off_t offset, size_t count)
 {
 	struct nvme_io_args args = {
 		.args_size = sizeof(args),
-		.hnd = nvme_ns_get_fd(n),
+		.hdl = nvme_ns_get_hdl(n),
 		.nsid = nvme_ns_get_nsid(n),
 		.control = 0,
 		.dsm = 0,
@@ -1750,7 +1750,7 @@ int nvme_ns_compare(nvme_ns_t n, void *buf, off_t offset, size_t count)
 
 int nvme_ns_flush(nvme_ns_t n)
 {
-	return nvme_flush(nvme_ns_get_fd(n), nvme_ns_get_nsid(n));
+	return nvme_flush(nvme_ns_get_hdl(n), nvme_ns_get_nsid(n));
 }
 
 static void nvme_ns_parse_descriptors(struct nvme_ns *n,
@@ -1825,28 +1825,28 @@ static void nvme_ns_set_generic_name(struct nvme_ns *n, const char *name)
 static nvme_ns_t nvme_ns_open(const char *name)
 {
 	struct nvme_ns *n;
-	struct dev_handle *hnd;
+	struct dev_handle *hdl;
 	n = calloc(1, sizeof(*n));
 	if (!n) {
 		errno = ENOMEM;
 		return NULL;
 	}
-	hnd = calloc(1, sizeof(*hnd));
-	if (!hnd) {
+	hdl = calloc(1, sizeof(*hdl));
+	if (!hdl) {
                 errno = ENOMEM;
                 return NULL;
         }
 
-	n->hnd = hnd;
+	n->hdl = hdl;
 	n->name = strdup(name);
-	hnd->fd = nvme_open(n->name);
-	if (hnd->fd < 0)
+	hdl->fd = nvme_open(n->name);
+	if (hdl->fd < 0)
 		goto free_ns;
 
 	nvme_ns_set_generic_name(n, name);
 
-	hnd->dev_type = NVME_DEV_DIRECT; 
-	if (nvme_get_nsid(hnd, &n->nsid) < 0)
+	hdl->dev_type = NVME_DEV_DIRECT; 
+	if (nvme_get_nsid(hdl, &n->nsid) < 0)
 		goto close_fd;
 
 	if (nvme_ns_init(n) != 0)
@@ -1857,11 +1857,11 @@ static nvme_ns_t nvme_ns_open(const char *name)
 	return n;
 
 close_fd:
-	close(hnd->fd);
+	close(hdl->fd);
 free_ns:
 	free(n->generic_name);
 	free(n->name);
-	free(n->hnd);
+	free(n->hdl);
 	free(n);
 	return NULL;
 }

@@ -21,6 +21,7 @@ mi_sources = [
     'nvme/log.c',
     'nvme/mi.c',
     'nvme/mi-mctp.c',
+    'nvme/handle.c',
 ]
 
 if json_c_dep.found()
@@ -37,6 +38,7 @@ deps = [
 
 mi_deps = [
     libdbus_dep,
+    libxnvme_dep,
 ]
 
 source_dir = meson.current_source_dir()
@@ -129,6 +131,7 @@ install_headers([
         'nvme/types.h',
         'nvme/util.h',
         'nvme/mi.h',
+        'nvme/handle.h',
     ],
     subdir: 'nvme',
     install_mode: mode,

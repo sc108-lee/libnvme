@@ -11,3 +11,4 @@ option('python', type : 'combo', choices : ['auto', 'true', 'false'], descriptio
 option('openssl', type : 'feature', value: 'auto', description : 'OpenSSL support')
 option('libdbus', type : 'feature', value: 'disabled', description : 'libdbus support')
 option('json-c', type : 'feature', value: 'auto', description : 'JSON support')
+option('xnvme', type: 'feature', value: 'disabled', description : 'xnvme backend suppport')
