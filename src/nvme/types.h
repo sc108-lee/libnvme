@@ -1196,7 +1196,13 @@ struct nvme_id_psd {
  * @rrls:      Read Recovery Levels. If a bit is set, then the corresponding
  *	       Read Recovery Level is supported. If a bit is cleared, then the
  *	       corresponding Read Recovery Level is not supported.
- * @rsvd102:	Reserved
+ * @bpcap:     Boot Partition Capabilities, see &enum nvme_id_ctrl_bpcap.
+ * @rsvd103:   Reserved
+ * @nssl:      NVM Subsystem Shutdown Latency (NSSL). This field indicates the
+ *	       typical latency in microseconds for an NVM Subsystem Shutdown to
+ *	       complete.
+ * @rsvd108:   Reserved
+ * @plsi:      Power Loss Signaling Information (PLSI), see &enum nvme_id_ctrl_plsi
  * @cntrltype: Controller Type, see &enum nvme_id_ctrl_cntrltype
  * @fguid:     FRU GUID, a 128-bit value that is globally unique for a given
  *	       Field Replaceable Unit
@@ -1206,7 +1212,9 @@ struct nvme_id_psd {
  *	       field is 2
  * @crdt3:     Controller Retry Delay time in 100 millisecond units if CQE CRD
  *	       field is 3
- * @rsvd134:   Reserved
+ * @crcap:     Controller Reachability Capabilities (CRCAP), see
+ *	       &enum nvme_id_ctrl_crcap
+ * @rsvd135:   Reserved
  * @nvmsr:     NVM Subsystem Report, see &enum nvme_id_ctrl_nvmsr
  * @vwci:      VPD Write Cycle Information, see &enum nvme_id_ctrl_vwci
  * @mec:       Management Endpoint Capabilities, see &enum nvme_id_ctrl_mec
@@ -1308,11 +1316,23 @@ struct nvme_id_psd {
  *	       for the Persistent Event Log.
  * @domainid:  Domain Identifier indicates the identifier of the domain
  *	       that contains this controller.
- * @rsvd358:   Reserved
+ * @kpioc:     Key Per I/O Capabilities (KPIOC), see &enum nvme_id_ctrl_kpioc
+ * @rsvd359:   Reserved
+ * @mptfawr:   Maximum Processing Time for Firmware Activation Without Reset
+ *	       (MPTFAWR). This field shall indicate the estimated maximum time
+ *	       in 100 ms units required by the controller to process a Firmware
+ *	       Commit command that specifies a value of 011b in the Commit
+ *	       Action field
+ * @rsvd362:   Reserved
  * @megcap:    Max Endurance Group Capacity indicates the maximum capacity
  *	       of a single Endurance Group.
  * @tmpthha:   Temperature Threshold Hysteresis Attributes
  * @rsvd385:   Reserved
+ * @cqt:       Command Quiesce Time (CQT). his field indicates the expected
+ *	       worst-case time in 1 millisecond units for the controller to
+ *	       quiesce all outstanding commands after a Keep Alive Timeout or
+ *	       other communication loss.
+ * @rsvd388:   Reserved
  * @sqes:      Submission Queue Entry Size, see &enum nvme_id_ctrl_sqes.
  * @cqes:      Completion Queue Entry Size, see &enum nvme_id_ctrl_cqes.
  * @maxcmd:    Maximum Outstanding Commands indicates the maximum number of
@@ -1359,7 +1379,17 @@ struct nvme_id_psd {
  * @oaqd:      Optimal Aggregated Queue Depth indicates the recommended maximum
  *	       total number of outstanding I/O commands across all I/O queues
  *	       on the controller for optimal operation.
- * @rsvd568:   Reserved
+ * @rhiri:     Recommended Host-Initiated Refresh Interval (RHIRI). If the
+ *	       Host-Initiated Refresh capability is supported, then this field
+ *	       indicates the recommended time interval in days from last power
+ *	       down to the time at which the host should initiate the
+ *	       Host-Initiated Refresh operation. If this field is cleared to
+ *	       0h, then this field is not reported.
+ * @hirt:      Host-Initiated Refresh Time (HIRT). If the Host-Initiated
+ *	       Refresh capability is supported, then this field indicates the
+ *	       nominal amount of time in minutes that the controller takes to
+ *	       complete the Host-Initiated Refresh operation. If this field is
+ *	       cleared to 0h, then this field is not reported.
  * @cmmrtd:    Controller Maximum Memory Range Tracking Descriptors indicates
  *             the maximum number of Memory Range Tracking Descriptors the
  *             controller supports.
@@ -1431,13 +1461,18 @@ struct nvme_id_ctrl {
 	__le32			oaes;
 	__le32			ctratt;
 	__le16			rrls;
-	__u8			rsvd102[9];
+	__u8			bpcap;
+	__u8			rsvd103;
+	__le32			nssl;
+	__u8			rsvd108[2];
+	__u8			plsi;
 	__u8			cntrltype;
 	__u8			fguid[16];
 	__le16			crdt1;
 	__le16			crdt2;
 	__le16			crdt3;
-	__u8			rsvd134[119];
+	__u8			crcap;
+	__u8			rsvd135[118];
 	__u8			nvmsr;
 	__u8			vwci;
 	__u8			mec;
@@ -1476,10 +1511,15 @@ struct nvme_id_ctrl {
 	__le32			nanagrpid;
 	__le32			pels;
 	__le16			domainid;
-	__u8			rsvd358[10];
+	__u8			kpioc;
+	__u8			rsvd359;
+	__le16			mptfawr;
+	__u8			rsvd362[6];
 	__u8			megcap[16];
 	__u8			tmpthha;
-	__u8			rsvd385[127];
+	__u8			rsvd385;
+	__le16			cqt;
+	__u8			rsvd388[124];
 	__u8			sqes;
 	__u8			cqes;
 	__le16			maxcmd;
@@ -1499,7 +1539,8 @@ struct nvme_id_ctrl {
 	__u8			maxdna[16];
 	__le32			maxcna;
 	__le32			oaqd;
-	__u8			rsvd568[2];
+	__u8			rhiri;
+	__u8			hirt;
 	__u16			cmmrtd;
 	__u16			nmmrtd;
 	__u8			minmrtg;
@@ -1738,6 +1779,50 @@ enum nvme_id_ctrl_ctratt {
 };
 
 /**
+ * enum nvme_id_ctrl_bpcap - Boot Partition Capabilities
+ * @NVME_CTRL_BACAP_RPMBBPWPS: RPMB Boot Partition Write Protection Support.
+ *				00b - Support for RPMB Boot Partition Write
+ *					Protection is not specified.
+ *				01b - RPMB Boot Partition Write Protection is
+ *					not supported by this controller.
+ *				10b - RPMB Boot Partition Write Protection is
+ *					supported by this controller.
+ *				11b - Reserved
+ * @NVME_CTRL_BACAP_SFBPWPS: Set Features Boot Partition Write Protection Support
+ */
+enum nvme_id_ctrl_bpcap {
+	NVME_CTRL_BACAP_RPMBBPWPS		= 3 << 0,
+	NVME_CTRL_BACAP_SFBPWPS			= 1 << 2,
+};
+
+/**
+ * enum nvme_id_ctrl_plsi - Power Loss Signaling Information
+ * @NVME_CTRL_PLSI_PLSEPF: If set, then the controller supports Power Loss
+ *			   Signaling with Emergency Power Fail.
+ * @NVME_CTRL_PLSI_PLSFQ: If set, then the controller supports Power Loss
+ *			  Signaling with Forced Quiescence.
+ */
+enum nvme_id_ctrl_plsi {
+	NVME_CTRL_PLSI_PLSEPF			= 1 << 0,
+	NVME_CTRL_PLSI_PLSFQ			= 1 << 1,
+};
+
+/**
+ * enum nvme_id_ctrl_crcap - Power Loss Signaling Information
+ * @NVME_CTRL_CRCAP_RRSUP: If set, then the NVM subsystem supports Reachability
+ *			   Reporting.
+ * @NVME_CTRL_CRCAP_RGIDC: If set, then the RGRPID field in the I/O Command
+ *			   Set Independent Identify Namespace data structure
+ *			   does not change while the namespace is attached to
+ *			   any controller.
+ */
+enum nvme_id_ctrl_crcap {
+	NVME_CTRL_CRCAP_RRSUP			= 1 << 0,
+	NVME_CTRL_CRCAP_RGIDC			= 1 << 1,
+};
+
+
+/**
  * enum nvme_id_ctrl_cntrltype - Controller types
  * @NVME_CTRL_CNTRLTYPE_IO: NVM I/O controller
  * @NVME_CTRL_CNTRLTYPE_DISCOVERY: Discovery controller
@@ -1767,7 +1852,7 @@ enum nvme_id_ctrl_dctype {
  * @NVME_CTRL_NVMSR_NVMESD: If set, then the NVM Subsystem is part of an NVMe
  *			    Storage Device; if cleared, then the NVM Subsystem
  *			    is not part of an NVMe Storage Device.
- * @NVME_CTRL_NVMSR_NVMEE:  If set’, then the NVM Subsystem is part of an NVMe
+ * @NVME_CTRL_NVMSR_NVMEE:  If set, then the NVM Subsystem is part of an NVMe
  *			    Enclosure; if cleared, then the NVM Subsystem is
  *			    not part of an NVMe Enclosure.
  */
@@ -2025,6 +2110,19 @@ enum nvme_id_ctrl_anacap {
 	NVME_CTRL_ANACAP_CHANGE			= 1 << 4,
 	NVME_CTRL_ANACAP_GRPID_NO_CHG		= 1 << 6,
 	NVME_CTRL_ANACAP_GRPID_MGMT		= 1 << 7,
+};
+
+/**
+ * enum nvme_id_ctrl_kpioc - Key Per I/O Capabilities.
+ * @NVME_CTRL_KPIOC_KPIOS:  If set, then the controller supports the Key Per
+ *			    I/O capability.
+ * @NVME_CTRL_KPIOC_KPIOSC: If set, tthen the Key Per I/O capability applies to
+ *			    all namespaces in the NVM subsystem when the Key
+ *			    Per I/O capability is enabled.
+ */
+enum nvme_id_ctrl_kpioc {
+	NVME_CTRL_KPIOC_KPIOS			= 1 << 0,
+	NVME_CTRL_KPIOC_KPIOSC			= 1 << 1,
 };
 
 /**
